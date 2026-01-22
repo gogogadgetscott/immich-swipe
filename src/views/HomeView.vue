@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useImmich } from '@/composables/useImmich'
 import { useUiStore } from '@/stores/ui'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -8,6 +8,8 @@ import AppHeader from '@/components/AppHeader.vue'
 import SwipeCard from '@/components/SwipeCard.vue'
 import ActionButtons from '@/components/ActionButtons.vue'
 import AlbumPicker from '@/components/AlbumPicker.vue'
+import SettingsModal from '@/components/SettingsModal.vue'
+import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
 
 const {
   currentAsset,
@@ -19,15 +21,21 @@ const {
   deletePhoto,
   undoLastAction,
   fetchAlbums,
+  fetchAssetAlbums,
+  getAssetAlbumIds,
   canUndo,
 } = useImmich()
 const uiStore = useUiStore()
 const preferencesStore = usePreferencesStore()
 
 const showAlbumPicker = ref(false)
+const showSettingsModal = ref(false)
+const showDeleteConfirm = ref(false)
 const isLoadingAlbums = ref(false)
 const albumsError = ref<string | null>(null)
 const albums = ref<ImmichAlbum[]>([])
+const currentAssetAlbumIds = ref<string[]>([])
+const pendingDelete = ref(false)
 
 // Keyboard navigation
 function handleKeydown(e: KeyboardEvent) {
@@ -49,7 +57,7 @@ function handleKeydown(e: KeyboardEvent) {
     keepPhoto()
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault()
-    deletePhoto()
+    handleDelete()
   } else if (e.key.toLowerCase() === 'f') {
     if (shouldIgnoreHotkeys()) return
     e.preventDefault()
@@ -86,6 +94,36 @@ async function ensureAlbumsLoaded() {
   }
 }
 
+async function loadCurrentAssetAlbums() {
+  if (!currentAsset.value) {
+    currentAssetAlbumIds.value = []
+    return
+  }
+
+  try {
+    // First check if we have cached album IDs
+    const cachedIds = getAssetAlbumIds(currentAsset.value.id)
+    if (cachedIds.length > 0) {
+      currentAssetAlbumIds.value = cachedIds
+      return
+    }
+
+    // If not cached, fetch them
+    const albumIds = await fetchAssetAlbums(currentAsset.value.id)
+    currentAssetAlbumIds.value = albumIds
+  } catch (e) {
+    console.error('Failed to load asset albums:', e)
+    currentAssetAlbumIds.value = []
+  }
+}
+
+const currentAssetAlbumNames = computed(() => {
+  if (!albums.value.length || !currentAssetAlbumIds.value.length) return []
+  return currentAssetAlbumIds.value
+    .map(id => albums.value.find(a => a.id === id)?.albumName)
+    .filter((name): name is string => !!name)
+})
+
 async function openAlbumPicker() {
   await ensureAlbumsLoaded()
   showAlbumPicker.value = true
@@ -108,10 +146,63 @@ function handleAssignHotkey(key: string, albumId: string | null) {
   }
 }
 
+function openSettingsModal() {
+  showSettingsModal.value = true
+}
+
+function closeSettingsModal() {
+  showSettingsModal.value = false
+}
+
+async function handleApplySettings() {
+  // Reload assets with new filters
+  await loadInitialAsset()
+}
+
+async function handleDelete() {
+  if (!currentAsset.value) return
+
+  // Check if asset is in any albums
+  await ensureAlbumsLoaded()
+  await loadCurrentAssetAlbums()
+
+  if (currentAssetAlbumIds.value.length > 0) {
+    // Show confirmation dialog
+    pendingDelete.value = true
+    showDeleteConfirm.value = true
+  } else {
+    // Delete directly
+    await deletePhoto()
+  }
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false
+  pendingDelete.value = false
+}
+
+async function confirmDelete() {
+  showDeleteConfirm.value = false
+  if (pendingDelete.value) {
+    await deletePhoto()
+    pendingDelete.value = false
+  }
+}
+
 watch(
   () => preferencesStore.reviewOrder,
   async () => {
     await loadInitialAsset()
+  }
+)
+
+watch(
+  () => currentAsset.value?.id,
+  async () => {
+    if (currentAsset.value) {
+      await ensureAlbumsLoaded()
+      await loadCurrentAssetAlbums()
+    }
   }
 )
 
@@ -129,7 +220,7 @@ onUnmounted(() => {
   <div class="viewport-fit flex flex-col"
     :class="uiStore.isDarkMode ? 'bg-black text-white' : 'bg-white text-black'"
   >
-    <AppHeader />
+    <AppHeader @open-settings="openSettingsModal" />
 
     <!-- Main content -->
     <main class="flex-1 flex flex-col px-4 safe-area-bottom min-h-0 gap-3 overflow-hidden">
@@ -166,8 +257,10 @@ onUnmounted(() => {
           <div v-if="currentAsset" class="w-full h-full max-w-4xl max-h-full">
             <SwipeCard
               :asset="currentAsset"
+              :album-ids="currentAssetAlbumIds"
+              :album-names="currentAssetAlbumNames"
               @keep="keepPhoto"
-              @delete="deletePhoto"
+              @delete="handleDelete"
             />
           </div>
 
@@ -189,7 +282,7 @@ onUnmounted(() => {
             :can-undo="canUndo"
             :is-favorite="currentAsset?.isFavorite ?? false"
             @keep="keepPhoto"
-            @delete="deletePhoto"
+            @delete="handleDelete"
             @undo="undoLastAction"
             @toggle-favorite="toggleFavorite"
             @open-album-picker="openAlbumPicker"
@@ -246,6 +339,21 @@ onUnmounted(() => {
       @close="closeAlbumPicker"
       @select="handleAlbumSelected"
       @assign-hotkey="handleAssignHotkey"
+    />
+
+    <SettingsModal
+      :open="showSettingsModal"
+      :albums="albums"
+      @close="closeSettingsModal"
+      @apply-settings="handleApplySettings"
+    />
+
+    <DeleteConfirmModal
+      :open="showDeleteConfirm"
+      :asset="currentAsset"
+      :album-names="currentAssetAlbumNames"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
     />
   </div>
 </template>

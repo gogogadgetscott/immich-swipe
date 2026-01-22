@@ -27,6 +27,7 @@ export function useImmich() {
   const RANDOM_MAX_ATTEMPTS = 20
 
   const albumsCache = ref<ImmichAlbum[] | null>(null)
+  const assetAlbumsCache = ref<Map<string, string[]>>(new Map())
 
   const chronologicalQueue = ref<ImmichAsset[]>([])
   const chronologicalSkip = ref(0)
@@ -43,9 +44,31 @@ export function useImmich() {
 
   const actionHistory = ref<ReviewAction[]>([])
 
-  function isReviewable(asset: ImmichAsset): boolean {
+  async function checkAlbumFilter(asset: ImmichAsset): Promise<boolean> {
+    const filter = preferencesStore.albumFilter
+    if (filter === 'all') return true
+
+    const albumIds = await fetchAssetAlbums(asset.id)
+
+    if (filter === 'in-albums') {
+      return albumIds.length > 0
+    }
+
+    if (filter === 'not-in-albums') {
+      return albumIds.length === 0
+    }
+
+    if (filter === 'specific-album' && preferencesStore.specificAlbumId) {
+      return albumIds.includes(preferencesStore.specificAlbumId)
+    }
+
+    return true
+  }
+
+  async function isReviewable(asset: ImmichAsset): Promise<boolean> {
     if (reviewedStore.isReviewed(asset.id)) return false
     if (uiStore.skipVideos && asset.type === 'VIDEO') return false
+    if (!await checkAlbumFilter(asset)) return false
     return true
   }
 
@@ -58,6 +81,7 @@ export function useImmich() {
     nextAsset.value = null
     pendingAssets.value = []
     actionHistory.value = []
+    assetAlbumsCache.value.clear()
   }
 
   watch(
@@ -138,8 +162,11 @@ export function useImmich() {
           continue
         }
 
-        const candidate = assets.find(isReviewable)
-        if (candidate) return candidate
+        for (const asset of assets) {
+          if (await isReviewable(asset)) {
+            return asset
+          }
+        }
       }
 
       if (uiStore.skipVideos) {
@@ -258,7 +285,12 @@ export function useImmich() {
         chronologicalPage.value += 1
       }
 
-      const filtered = batch.items.filter(isReviewable)
+      const filtered: ImmichAsset[] = []
+      for (const asset of batch.items) {
+        if (await isReviewable(asset)) {
+          filtered.push(asset)
+        }
+      }
       chronologicalQueue.value.push(...filtered)
     } catch (e) {
       console.error('Failed to fetch chronological assets:', e)
@@ -411,6 +443,40 @@ export function useImmich() {
     const albums = Array.from(albumMap.values())
     albumsCache.value = albums
     return albums
+  }
+
+  async function fetchAssetAlbums(assetId: string): Promise<string[]> {
+    if (assetAlbumsCache.value.has(assetId)) {
+      return assetAlbumsCache.value.get(assetId)!
+    }
+
+    try {
+      const albums = await fetchAlbums()
+      const assetAlbums: string[] = []
+
+      // Check each album to see if it contains this asset
+      for (const album of albums) {
+        try {
+          const albumDetails = await apiRequest<ImmichAlbum & { assets?: Array<{ id: string }> }>(`/albums/${album.id}`)
+          if (albumDetails.assets?.some(a => a.id === assetId)) {
+            assetAlbums.push(album.id)
+          }
+        } catch (e) {
+          // Skip albums we can't access
+          console.warn(`Failed to fetch album ${album.id}:`, e)
+        }
+      }
+
+      assetAlbumsCache.value.set(assetId, assetAlbums)
+      return assetAlbums
+    } catch (e) {
+      console.error('Failed to fetch asset albums:', e)
+      return []
+    }
+  }
+
+  function getAssetAlbumIds(assetId: string): string[] {
+    return assetAlbumsCache.value.get(assetId) || []
   }
 
   async function addAssetToAlbum(albumId: string, assetId: string): Promise<void> {
@@ -600,5 +666,7 @@ export function useImmich() {
     getAuthHeaders,
     fetchAlbums,
     addAssetToAlbum,
+    fetchAssetAlbums,
+    getAssetAlbumIds,
   }
 }

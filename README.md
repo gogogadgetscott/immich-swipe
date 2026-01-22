@@ -24,7 +24,11 @@ Swipe-review your Immich library: right = keep, left = trash. Like a dating app,
 
 - Swipe (touch/mouse) or use keyboard/buttons
 - Random or chronological review (oldest/newest first)
-- Skip videos toggle
+- Settings modal with:
+  - Skip videos toggle
+  - Album filters (all, in albums, not in albums, specific album)
+- Album membership indicator on photos
+- Delete confirmation for photos in albums
 - Favorite toggle (press `F`)
 - Add-to-album (+ configurable `0–9` hotkeys)
 - Undo (Ctrl/⌘+Z or ↑)
@@ -134,7 +138,7 @@ See also: https://docs.immich.app/administration/reverse-proxy/
 - `immich-swipe-skip-videos`
 - `immich-swipe-stats:<server>:<user>` (keep/delete counters)
 - `immich-swipe-reviewed:<server>:<user>` (already reviewed IDs + decision)
-- `immich-swipe-preferences:<server>:<user>` (order mode + album hotkeys)
+- `immich-swipe-preferences:<server>:<user>` (order mode, album hotkeys, album filters)
 
 ## Immich API key permissions
 

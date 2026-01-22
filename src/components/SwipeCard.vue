@@ -7,6 +7,8 @@ import type { ImmichAsset } from '@/types/immich'
 
 const props = defineProps<{
   asset: ImmichAsset
+  albumIds?: string[]
+  albumNames?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -278,6 +280,16 @@ const formattedDate = computed(() => {
     day: 'numeric',
   })
 })
+
+const hasAlbums = computed(() => props.albumIds && props.albumIds.length > 0)
+const albumCount = computed(() => props.albumIds?.length || 0)
+const albumDisplayText = computed(() => {
+  if (!hasAlbums.value) return ''
+  if (albumCount.value === 1 && props.albumNames && props.albumNames.length > 0) {
+    return props.albumNames[0]
+  }
+  return `${albumCount.value} album${albumCount.value > 1 ? 's' : ''}`
+})
 </script>
 
 <template>
@@ -373,8 +385,21 @@ const formattedDate = computed(() => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 17L17 7M10 7h7v7" />
           </svg>
         </button>
-        <div class="min-w-0">
-          <p class="text-white text-sm truncate">{{ asset.originalFileName }}</p>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <p class="text-white text-sm truncate flex-1">{{ asset.originalFileName }}</p>
+            <!-- Album indicator badge -->
+            <div
+              v-if="hasAlbums"
+              class="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/80 text-white text-xs font-medium shrink-0"
+              :title="`In ${albumDisplayText}`"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span>{{ albumCount }}</span>
+            </div>
+          </div>
           <p class="text-white/70 text-xs">{{ formattedDate }}</p>
         </div>
       </div>

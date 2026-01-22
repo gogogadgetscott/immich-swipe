@@ -6,6 +6,10 @@ import { usePreferencesStore } from '@/stores/preferences'
 import { useReviewedStore } from '@/stores/reviewed'
 import { ref } from 'vue'
 
+const emit = defineEmits<{
+  openSettings: []
+}>()
+
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 const preferencesStore = usePreferencesStore()
@@ -112,27 +116,32 @@ function confirmResetReviewed() {
         </span>
       </button>
 
-      <!-- Skip videos toggle -->
+      <!-- Settings button -->
       <button
-        @click="uiStore.toggleSkipVideos()"
+        @click="emit('openSettings')"
         class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border transition-colors"
-        :class="uiStore.skipVideos
-          ? 'bg-green-600 border-green-500 text-white'
-          : uiStore.isDarkMode
-            ? 'border-gray-700 text-gray-300 hover:bg-gray-800'
-            : 'border-gray-300 text-gray-600 hover:bg-gray-100'"
-        :aria-pressed="uiStore.skipVideos"
+        :class="uiStore.isDarkMode
+          ? 'border-gray-700 text-gray-300 hover:bg-gray-800'
+          : 'border-gray-300 text-gray-600 hover:bg-gray-100'"
+        aria-label="Open settings"
+        title="Settings"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
             stroke-width="2"
-            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-3 4h7a2 2 0 002-2V8a2 2 0 00-2-2h-7M9 18H6a2 2 0 01-2-2V8a2 2 0 012-2h3m0 12V6"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
           />
         </svg>
-        <span>
-          Skip videos
+        <span class="hidden sm:inline">
+          Settings
         </span>
       </button>
 
