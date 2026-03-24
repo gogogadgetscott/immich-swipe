@@ -24,4 +24,10 @@ services:
     restart: unless-stopped
     ports:
       - "2293:80"
+    networks:
+      - immich-network
+
+networks:
+  immich-network:
+    external: true
 
