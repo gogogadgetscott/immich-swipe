@@ -154,6 +154,11 @@ export const useAuthStore = defineStore('auth', () => {
   // Initialize
   loadConfig()
 
+  // .env single user overrides localStorage (fixes stale manual-login URL)
+  if (envConfig && envConfig.users.length === 1) {
+    setConfig(envConfig.serverUrl, envConfig.users[0].apiKey, envConfig.users[0].name)
+  }
+
   return {
     serverUrl,
     apiKey,

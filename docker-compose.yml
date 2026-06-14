@@ -1,6 +1,3 @@
-# Docker Compose
-
-version: "3.8"
 
 services:
   immich-swipe:
@@ -23,7 +20,7 @@ services:
     container_name: immich-swipe
     restart: unless-stopped
     ports:
-      - "2293:80"
+      - "2286:80"
     networks:
       - immich-network
 
